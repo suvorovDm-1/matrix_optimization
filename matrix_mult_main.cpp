@@ -20,19 +20,29 @@ void generation(double * mat, size_t size)
 		mat[i] = uniform_distance(gen);
 }
 
-void matrix_mult(double * a, double * b, double * res, size_t size)
-{
-#pragma omp parallel for
-	for (int i = 0; i < size; i++)
-	{
-		for (int j = 0; j < size; j++)
-	    {
-			for (int k = 0; k < size; k++)
-		    {
-				res[i*size + j] += a[i*size + k] * b[k*size + j];
-			}
-		}
-	}
+void matrix_mult(double* matrixA, double* matrixB, double* resultMatrix, size_t matrixSize) {
+    const int blockSize = 32;
+
+    #pragma omp parallel for collapse(2)
+    for (int blockRow = 0; blockRow < matrixSize; blockRow += blockSize) {
+        for (int blockCol = 0; blockCol < matrixSize; blockCol += blockSize) {
+            for (int blockK = 0; blockK < matrixSize; blockK += blockSize) {
+                int blockRowEnd = std::min(blockRow + blockSize, static_cast<int>(matrixSize));
+                int blockColEnd = std::min(blockCol + blockSize, static_cast<int>(matrixSize));
+                int blockKEnd = std::min(blockK + blockSize, static_cast<int>(matrixSize));
+
+                for (int row = blockRow; row < blockRowEnd; ++row) {
+                    for (int innerK = blockK; innerK < blockKEnd; ++innerK) {
+                        double tempValue = matrixA[row * matrixSize + innerK];
+                        #pragma omp simd aligned(matrixA, matrixB, resultMatrix: 64)
+                        for (int col = blockCol; col < blockColEnd; ++col) {
+                            resultMatrix[row * matrixSize + col] += tempValue * matrixB[innerK * matrixSize + col];
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 int main()
